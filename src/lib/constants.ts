@@ -100,11 +100,11 @@ export const AI = {
     "gemini-3.5-flash-lite",
   ],
   /** Files per request (more files per request = fewer requests). */
-  batchSize: 3,
+  batchSize: 4,
   /** Stay below the free-tier per-minute limit (Flash models: ~10 per minute). */
-  maxRequestsPerMinute: 5,
+  maxRequestsPerMinute: 10,
   /** Requests running at the same time (1 = no bursts, fewer 429 errors). */
-  concurrency: 1,
+  concurrency: 2,
   /** Tries per file before it is marked Failed (rate-limit waits do not count). */
   maxAttempts: 3,
   requestTimeoutMs: 120_000,

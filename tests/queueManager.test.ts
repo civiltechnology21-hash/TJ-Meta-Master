@@ -67,12 +67,12 @@ function setup(
 }
 
 describe("BatchRunner", () => {
-  it("groups files (3 per request) and finishes", async () => {
+  it("groups files (4 per request) and finishes", async () => {
     const t = setup(10, async (_c, ids) => new Map(ids.map((id) => [id, okEntry(id)])));
     t.runner.start();
     await t.done();
     expect(t.items.every((i) => i.status === "success")).toBe(true);
-    expect(t.calls()).toBe(4); // 3 + 3 + 3 + 1
+    expect(t.calls()).toBe(3); // 4 + 4 + 2
     expect(t.items[0]!.meta?.title.endsWith(".")).toBe(true);
     expect(t.items[0]!.meta?.keywords).toHaveLength(6);
     expect(t.items[0]!.previews).toHaveLength(0);
@@ -151,7 +151,7 @@ describe("BatchRunner", () => {
     });
     t.runner.start();
     await t.done();
-    expect(Math.max(...seen.map((x) => x.length))).toBeLessThanOrEqual(4);
+    expect(Math.max(...seen.map((x) => x.length))).toBeLessThanOrEqual(8); // 2 requests x 4 files
   });
 
   it("503 / busy: resends the SAME group (no splitting), then succeeds", async () => {

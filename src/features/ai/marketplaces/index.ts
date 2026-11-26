@@ -51,7 +51,7 @@ export function descriptionRange(rules: MarketplaceRules): { min: number; max: n
   };
 }
 
-/** Title slider range for this marketplace (Adobe Stock: at most 70 characters). */
+/** Title slider range for this marketplace (Adobe Stock: up to 200 characters). */
 export function titleRange(rules: MarketplaceRules): { min: number; max: number } {
   const max = Math.min(rules.titleMax ?? SLIDER_LIMITS.title.max, SLIDER_LIMITS.title.max);
   return { min: Math.min(SLIDER_LIMITS.title.min, max), max };

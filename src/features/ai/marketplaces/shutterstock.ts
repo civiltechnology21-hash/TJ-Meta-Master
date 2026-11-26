@@ -68,8 +68,8 @@ export const SHUTTERSTOCK_DROPPED_KEYWORDS = [
 export const SHUTTERSTOCK_RULES: MarketplaceRules = {
   hasTitle: false,
   descriptionRequired: true,
-  // Shutterstock's editor accepts 150 characters (the policy page says 2048; the stricter one wins).
-  descriptionMax: 150,
+  // Shutterstock's real maximum is 2048 characters (official CSV/standards page). The slider decides the length.
+  descriptionMax: 2048,
   descriptionMinWords: 5,
   descriptionSafeChars: true,
   noRepeatedDescriptionWords: true,
@@ -92,7 +92,7 @@ export function buildShutterstockInstruction(
   const negativeBlock = buildNegativeSection(negative);
   const negativeSection = negativeBlock ? `\n${negativeBlock}\n` : "";
   const k = requestedKeywordCount(c.keywordCount);
-  const dMax = Math.min(140, c.descriptionLimit - 3);
+  const dMax = c.descriptionLimit - 3;
   const dMin = Math.max(30, Math.min(70, dMax - 20));
 
   return `You are a senior Shutterstock metadata and search specialist. For every file you write ONE DESCRIPTION, ordered KEYWORDS and CATEGORIES that help a buyer find exactly this file. Shutterstock has a single "description/title" field, so you write only a description and NEVER a separate title. All files are commercial stock files.

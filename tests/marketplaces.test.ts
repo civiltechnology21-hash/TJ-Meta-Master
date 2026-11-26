@@ -50,16 +50,16 @@ describe("marketplace registry", () => {
 });
 
 describe("effectiveConstraints", () => {
-  it("Adobe Stock: title at most 70, keywords at most 49, description locked Off (no description field)", () => {
-    expect(effectiveConstraints(AS, c)).toEqual({ titleLimit: 70, descriptionLimit: 0, keywordCount: 49 });
+  it("Adobe Stock: title up to 200, keywords at most 49, description locked Off (no description field)", () => {
+    expect(effectiveConstraints(AS, c)).toEqual({ titleLimit: 200, descriptionLimit: 0, keywordCount: 49 });
     expect(effectiveConstraints(AS, { ...c, titleLimit: 64 }).titleLimit).toBe(64);
   });
-  it("Shutterstock: description at most 150, never Off, keywords at most 50", () => {
-    expect(effectiveConstraints(SS, c).descriptionLimit).toBe(150);
-    expect(effectiveConstraints(SS, { ...c, descriptionLimit: 0 }).descriptionLimit).toBe(150);
+  it("Shutterstock: description up to 2048, never Off, keywords at most 50", () => {
+    expect(effectiveConstraints(SS, c).descriptionLimit).toBe(c.descriptionLimit);
+    expect(effectiveConstraints(SS, { ...c, descriptionLimit: 0 }).descriptionLimit).toBe(2048);
     expect(effectiveConstraints(SS, { ...c, descriptionLimit: 20 }).descriptionLimit).toBe(50);
     expect(effectiveConstraints(SS, c).keywordCount).toBe(50);
-    expect(descriptionRange(SS)).toEqual({ min: 50, max: 150 });
+    expect(descriptionRange(SS)).toEqual({ min: 50, max: 2048 });
   });
 });
 

@@ -220,6 +220,13 @@ interface GenerateResponse {
   promptFeedback?: { blockReason?: string };
 }
 
+/** Smallest "thinking" setting each Gemini generation accepts (big speed-up, same quality here). */
+export function thinkingConfigFor(model: string): Record<string, unknown> | undefined {
+  if (/gemini-3/.test(model)) return { thinkingLevel: "minimal" };
+  if (/gemini-2\.5-(flash|flash-lite)/.test(model)) return { thinkingBudget: 0 };
+  return undefined;
+}
+
 /** One request = metadata for up to `AI.batchSize` files. Returns entries by item id. */
 export async function generateBatch(args: GenerateArgs): Promise<Map<number, RawEntry>> {
   const { apiKey, model, items, constraints, signal, marketplace, negative } = args;
@@ -247,6 +254,9 @@ export async function generateBatch(args: GenerateArgs): Promise<Map<number, Raw
         contents: [{ role: "user", parts }],
         generationConfig: {
           responseMimeType: "application/json",
+          temperature: 0.4,
+          // Metadata is a simple visual task: "thinking" only adds minutes. Turn it to the minimum.
+          thinkingConfig: thinkingConfigFor(model),
           responseSchema: buildResponseSchema(constraints.descriptionLimit > 0, {
             withTitle: rules.hasTitle,
             withCategories: Boolean(rules.categories),

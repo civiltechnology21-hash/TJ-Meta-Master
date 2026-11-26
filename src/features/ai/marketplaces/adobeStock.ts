@@ -18,7 +18,7 @@ export const ADOBE_BANNED_TERMS = [
 
 /**
  * Adobe Stock: Filename, Title, Description (optional), Keywords.
- * Hard limits (Adobe ruleset 2026-11-26): title 20-70 characters, 5-49 keywords,
+ * Hard limits (Adobe ruleset 2026-11-26): title 20-200 characters (the slider decides), 5-49 keywords,
  * every title word inside the first 10 keywords, no banned wording.
  */
 export const ADOBE_STOCK_RULES: MarketplaceRules = {
@@ -27,7 +27,7 @@ export const ADOBE_STOCK_RULES: MarketplaceRules = {
   // Adobe Stock has no description field: the slider is locked to Off.
   descriptionSupported: false,
   csvColumns: ["filename", "title", "description", "keywords"],
-  titleMax: 70,
+  titleMax: 200,
   titleMinChars: 20,
   titleStrict: true,
   titleWordsInTopKeywords: 10,
@@ -75,7 +75,7 @@ INTERNAL PROCESS (think through it silently; never show it)
 TITLE
 - One short, natural, spoken-sounding phrase, not a formal sentence and not a keyword list. Structure: [main subject] + [action or state] + [setting or key attribute]. Example: "Senior woman flexing muscles on a sunny beach". Order: primary subject / overall theme, then important secondary element, then distinguishing visual trait, then context or composition.
 - Lead with the single most visually dominant subject. It must make clear at once what the file is. Every important concept in it must be supported by the file. Do not exaggerate, repeat words or insert unrelated SEO terms.
-- Between ${Math.min(40, t.max - 10)} and ${t.max} characters. Never longer than ${t.max} (Adobe's hard maximum is 70). If it is too long, remove adjectives first, never the main subject. No full stop at the end (it is added later).
+- Between ${Math.min(40, t.max - 10)} and ${t.max} characters. Never longer than ${t.max}. If it is too long, remove adjectives first, never the main subject. No full stop at the end (it is added later).
 - No commas, colons, semicolons, pipes, slashes, quotes, hashtags, emojis or ALL CAPS. Capitalize only the first word and proper nouns.
 - Add a place only if it is real, clearly shown and certain; otherwise leave it out.
 - State the asset form only when it disambiguates ("Seamless pattern", "Icon set", "Isometric illustration").
