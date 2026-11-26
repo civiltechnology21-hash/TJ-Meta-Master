@@ -24,6 +24,8 @@ export const ADOBE_BANNED_TERMS = [
 export const ADOBE_STOCK_RULES: MarketplaceRules = {
   hasTitle: true,
   descriptionRequired: false,
+  // Adobe Stock has no description field: the slider is locked to Off.
+  descriptionSupported: false,
   csvColumns: ["filename", "title", "description", "keywords"],
   titleMax: 70,
   titleMinChars: 20,

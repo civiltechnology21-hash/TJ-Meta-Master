@@ -5,7 +5,7 @@ import { getMarketplace } from "@/features/ai/marketplaces";
 import { normalizeMeta } from "@/features/metadata/normalizer";
 import { describeViolations, findNegativeViolations, violationTerms } from "@/features/negative/matcher";
 import type { NegativePolicy } from "@/types/negative";
-import { validateMeta } from "@/features/metadata/validator";
+import { softIssues, validateMeta } from "@/features/metadata/validator";
 import { AI } from "@/lib/constants";
 import { isAbortError, sleep } from "@/lib/utils";
 import type { BatchItem, BatchStatus, ItemError } from "@/types/batch";
@@ -291,13 +291,21 @@ export class BatchRunner {
           return;
         }
         const rules = getMarketplace(this.hooks.getMarketplace?.()).rules;
-        const meta = normalizeMeta(raw, this.constraints, rules, { kind: item.kind });
+        // Second try (or later) for this file: soft rules are no longer enforced.
+        const lastChance = item.attempts >= 1;
+        const meta = normalizeMeta(raw, this.constraints, rules, { kind: item.kind, lastChance });
         const check = validateMeta(meta, this.constraints, rules, { kind: item.kind });
         if (!check.ok) {
           this.failOrRetry(
             item,
             new AiError("VALIDATION", check.issues.join(" "), { retriable: true }),
           );
+          return;
+        }
+        // Non-mandatory rules: ask once more, then take whatever comes back.
+        const soft = lastChance ? [] : softIssues(meta, rules);
+        if (soft.length > 0) {
+          this.failOrRetry(item, new AiError("VALIDATION", soft.join(" "), { retriable: true }));
           return;
         }
         // Negative Prompt (only when the user typed something): a result that still contains

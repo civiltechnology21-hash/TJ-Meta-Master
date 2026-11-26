@@ -10,7 +10,9 @@ import {
   stem,
   titleWordsMissing,
 } from "@/features/metadata/rulesText";
-import { validateMeta } from "@/features/metadata/validator";
+import { softIssues, validateMeta } from "@/features/metadata/validator";
+import { buildNegativePolicy } from "@/features/negative/policy";
+import { stripBanned } from "@/features/metadata/rulesText";
 import type { UserConstraints } from "@/types/metadata";
 
 const AS = getMarketplace("adobe-stock").rules;
@@ -106,11 +108,15 @@ describe("Shutterstock rules", () => {
     expect(meta.description).toBe("Soft blue backdrop with glowing circles and sparkles modern look.");
     expect(validateMeta(meta, ssC, SS)).toMatchObject({ ok: true });
   });
-  it("rejects repeated words, too few words, banned wording", () => {
+  it("a repeated description word is a SOFT issue (never blocks, never fails a file)", () => {
+    const meta = { title: "", description: "Blue sea with blue sky.", keywords: ["a1", "b1", "c1", "d1", "e1", "f1", "g1"], categories: ["Nature"] };
+    expect(validateMeta(meta, ssC, SS).ok).toBe(true);
+    expect(softIssues(meta, SS).join(" ")).toMatch(/repeats a word: blue/);
+    expect(softIssues({ ...meta, description: "Blue sea under clear sky." }, SS)).toEqual([]);
+    expect(softIssues({ ...meta, categories: [] }, SS)).toContain("No valid category.");
+  });
+  it("rejects too few words and banned wording", () => {
     const base = { title: "", keywords: ["a1", "b1", "c1", "d1", "e1", "f1", "g1"], categories: ["Nature"] };
-    expect(validateMeta({ ...base, description: "Blue sea with blue sky." }, ssC, SS).issues.join(" ")).toMatch(
-      /repeats a word: blue/,
-    );
     expect(validateMeta({ ...base, description: "Blue sea." }, ssC, SS).issues.join(" ")).toMatch(/at least 5 words/);
     expect(validateMeta({ ...base, description: "The best blue sea at sunrise." }, ssC, SS).issues.join(" ")).toMatch(
       /banned wording/,
@@ -130,5 +136,46 @@ describe("Shutterstock rules", () => {
     expect(normalizeMeta(raw, ssC, SS, { kind: "video" }).categories).toEqual(["Technology", "Nature"]);
     const meta = { title: "", description: "Soft blue sea at sunrise today.", keywords: ["a1","b1","c1","d1","e1","f1","g1"], categories: ["Abstract"] };
     expect(validateMeta(meta, ssC, SS, { kind: "video" }).issues).toContain("A category is not available for video.");
+  });
+});
+
+describe("banned wording is cut out instead of failing the file", () => {
+  it("stripBanned removes whole words only", () => {
+    expect(stripBanned("The best beautiful beach, bestseller", ["best", "beautiful"])).toBe("The beach, bestseller");
+    expect(stripBanned("AI-generated art", ["ai generated"])).toBe("art");
+  });
+  it("Adobe title and Shutterstock description are repaired in normalizeMeta", () => {
+    const a = normalizeMeta(
+      { title: "Stunning senior woman on a sunny beach", keywords: ["woman", "beach", "senior", "sunny", "sea", "sand"] },
+      adobeC,
+      AS,
+    );
+    expect(a.title).toBe("Senior woman on a sunny beach.");
+    expect(validateMeta(a, adobeC, AS).ok).toBe(true);
+    const s = normalizeMeta(
+      { title: "", description: "The best soft blue backdrop with glowing circles", keywords: ["blue"], categories: ["Abstract"] },
+      ssC,
+      SS,
+    );
+    expect(s.description).toBe("The soft blue backdrop with glowing circles.");
+  });
+});
+
+describe("last chance category fallback", () => {
+  const raw = { title: "", description: "Soft blue sea at sunrise today", keywords: ["sea"], categories: ["Nonsense"] };
+  it("no fallback on the first try, Miscellaneous (or Objects for video) on the last", () => {
+    expect(normalizeMeta(raw, ssC, SS).categories).toEqual([]);
+    expect(normalizeMeta(raw, ssC, SS, { lastChance: true }).categories).toEqual(["Miscellaneous"]);
+    expect(normalizeMeta(raw, ssC, SS, { lastChance: true, kind: "video" }).categories).toEqual(["Objects"]);
+  });
+});
+
+describe("negative titles are ignored when the marketplace has no title", () => {
+  const input = { titles: ["Santa Claus holiday card"], keywords: ["santa"] };
+  it("keeps keyword rules and drops title examples", () => {
+    expect(buildNegativePolicy(input)?.titleExamples).toHaveLength(1);
+    const p = buildNegativePolicy(input, { withTitles: false });
+    expect(p?.titleExamples).toHaveLength(0);
+    expect(p?.keywords).toHaveLength(1);
   });
 });

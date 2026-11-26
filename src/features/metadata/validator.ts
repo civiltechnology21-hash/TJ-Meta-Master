@@ -67,10 +67,6 @@ export function validateMeta(
     if (banned(meta.description).length > 0) {
       issues.push(`Description uses banned wording: ${banned(meta.description).join(", ")}.`);
     }
-    if (rules?.noRepeatedDescriptionWords) {
-      const repeated = repeatedWords(meta.description);
-      if (repeated.length > 0) issues.push(`Description repeats a word: ${repeated.slice(0, 3).join(", ")}.`);
-    }
   }
 
   // keywords
@@ -97,7 +93,6 @@ export function validateMeta(
   // categories (only for marketplaces that use them; names were matched to the list already)
   if (rules?.categories) {
     const cats = meta.categories ?? [];
-    if (cats.length < 1) issues.push("No valid category.");
     if (cats.length > (rules.categoryCount ?? 2)) issues.push("Too many categories.");
     if (cats.some((x) => !rules.categories!.includes(x))) issues.push("Unknown category.");
     if (opts.kind === "video" && cats.some((x) => rules.categoriesNotForVideo?.includes(x))) {
@@ -109,6 +104,20 @@ export function validateMeta(
   }
 
   return { ok: issues.length === 0, issues, warnings };
+}
+
+/**
+ * Rules that are NOT mandatory. A file that breaks one is generated again ONCE; if the
+ * second answer still breaks it, that answer is accepted (a file never fails because of these).
+ */
+export function softIssues(meta: MetaResult, rules?: MarketplaceRules): string[] {
+  const out: string[] = [];
+  if (rules?.noRepeatedDescriptionWords && meta.description) {
+    const repeated = repeatedWords(meta.description);
+    if (repeated.length > 0) out.push(`Description repeats a word: ${repeated.slice(0, 3).join(", ")}.`);
+  }
+  if (rules?.categories && (meta.categories ?? []).length < 1) out.push("No valid category.");
+  return out;
 }
 
 /** Numbers shown above each text box in a result card. */

@@ -65,6 +65,7 @@ const ruleNumber = (n: number) => String(n).padStart(3, "0");
  */
 export function buildNegativePolicy(
   input: NegativePromptInput | null | undefined,
+  opts: { withTitles?: boolean } = {},
 ): NegativePolicy | null {
   if (!input) return null;
   const clean = sanitizeNegativeInput(input);
@@ -90,7 +91,8 @@ export function buildNegativePolicy(
 
   const titleExamples: NegativeTitleExample[] = [];
   const seenTitles = new Set<string>();
-  for (const row of clean.titles) {
+  // A marketplace without a title field (Shutterstock) ignores the title examples.
+  for (const row of opts.withTitles === false ? [] : clean.titles) {
     const tokens = tokenize(row);
     const key = tokens.join(" ");
     if (!key || seenTitles.has(key)) continue;

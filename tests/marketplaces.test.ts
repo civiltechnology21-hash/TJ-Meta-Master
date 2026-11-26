@@ -9,7 +9,7 @@ import {
 import { SHUTTERSTOCK_CATEGORIES } from "@/features/ai/marketplaces/shutterstock";
 import { buildCsv, csvFileName } from "@/features/csv/buildCsv";
 import { normalizeCategories, normalizeMeta } from "@/features/metadata/normalizer";
-import { validateMeta } from "@/features/metadata/validator";
+import { softIssues, validateMeta } from "@/features/metadata/validator";
 import type { BatchItem } from "@/types/batch";
 import type { UserConstraints } from "@/types/metadata";
 
@@ -50,9 +50,8 @@ describe("marketplace registry", () => {
 });
 
 describe("effectiveConstraints", () => {
-  it("Adobe Stock: title at most 70, keywords at most 49, description may be Off", () => {
-    expect(effectiveConstraints(AS, c)).toEqual({ titleLimit: 70, descriptionLimit: 250, keywordCount: 49 });
-    expect(effectiveConstraints(AS, { ...c, descriptionLimit: 0 }).descriptionLimit).toBe(0);
+  it("Adobe Stock: title at most 70, keywords at most 49, description locked Off (no description field)", () => {
+    expect(effectiveConstraints(AS, c)).toEqual({ titleLimit: 70, descriptionLimit: 0, keywordCount: 49 });
     expect(effectiveConstraints(AS, { ...c, titleLimit: 64 }).titleLimit).toBe(64);
   });
   it("Shutterstock: description at most 150, never Off, keywords at most 50", () => {
@@ -112,9 +111,9 @@ describe("Shutterstock normalize + validate", () => {
     expect(meta.categories).toEqual(["Abstract", "Backgrounds/Textures"]);
     expect(validateMeta(meta, eff, SS)).toMatchObject({ ok: true });
   });
-  it("rejects a result without a valid category or with too few keywords", () => {
+  it("flags a missing category (soft: one more try) and rejects too few keywords", () => {
     const noCat = normalizeMeta({ ...raw, categories: ["Nonsense"] }, eff, SS);
-    expect(validateMeta(noCat, eff, SS).issues).toContain("No valid category.");
+    expect(softIssues(noCat, SS)).toContain("No valid category.");
     const few = normalizeMeta({ ...raw, keywords: ["a1", "b1", "c1"] }, eff, SS);
     expect(validateMeta(few, eff, SS).issues).toContain("Too few keywords.");
   });

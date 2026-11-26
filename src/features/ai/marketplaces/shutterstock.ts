@@ -81,6 +81,7 @@ export const SHUTTERSTOCK_RULES: MarketplaceRules = {
   categories: SHUTTERSTOCK_CATEGORIES,
   categoryCount: 2,
   categoriesNotForVideo: SHUTTERSTOCK_NOT_FOR_VIDEO,
+  fallbackCategories: ["Miscellaneous", "Objects"],
   csvColumns: ["filename", "description", "keywords", "categories"],
 };
 

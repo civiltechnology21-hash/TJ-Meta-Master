@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeEpsi, parseDosEpsHeader } from "@/features/thumbnail/epsThumb";
+import { decodeEpsi, decodePaletteWithAlpha, parseDosEpsHeader } from "@/features/thumbnail/epsThumb";
 import { fitSize, sniffImageSize } from "@/features/thumbnail/imageThumb";
 
 describe("sniffImageSize", () => {
@@ -87,5 +87,45 @@ describe("EPS bounding box", () => {
     expect(dpiFor({ width: 600, height: 400 }, 768)).toBe(92); // 600pt @92dpi = 767px
     expect(dpiFor(null, 768)).toBe(96);
     expect(dpiFor({ width: 1, height: 1 }, 768)).toBe(600); // never above 600 dpi
+  });
+});
+
+describe("decodePaletteWithAlpha (Illustrator EPS preview: palette index + alpha per pixel)", () => {
+  // 3 x 1 image. Palette: 0 = red, 1 = blue. Pixels: (red, opaque) (blue, opaque) (red, transparent)
+  const cmap = new Array<number>(768).fill(0);
+  cmap[0] = 255 << 8; // R of index 0
+  cmap[512 + 1] = 255 << 8; // B of index 1
+  const bytes = new Uint8Array([0, 255, 1, 255, 0, 0]);
+  const tags = {
+    width: 3,
+    height: 1,
+    t258: [8],
+    t259: [1],
+    t262: [3],
+    t273: [0],
+    t277: [2],
+    t279: [6],
+    t320: cmap,
+    t338: [1],
+  };
+
+  it("reads 2 bytes per pixel (not 1) and keeps the alpha", () => {
+    const out = decodePaletteWithAlpha(bytes.buffer, tags)!;
+    expect([out.width, out.height]).toEqual([3, 1]);
+    expect(Array.from(out.rgba)).toEqual([255, 0, 0, 255, 0, 0, 255, 255, 255, 0, 0, 0]);
+  });
+  it("un-multiplies colors when alpha is already multiplied in", () => {
+    const half = new Uint8Array([0, 128]);
+    const c = new Array<number>(768).fill(0);
+    c[0] = 128 << 8; // premultiplied red at 50% alpha
+    const out = decodePaletteWithAlpha(half.buffer, { ...tags, width: 1, t273: [0], t279: [2], t320: c })!;
+    expect(out.rgba[0]).toBe(255);
+    expect(out.rgba[3]).toBe(128);
+  });
+  it("returns null for other TIFF kinds and for truncated data", () => {
+    expect(decodePaletteWithAlpha(bytes.buffer, { ...tags, t277: [1] })).toBeNull();
+    expect(decodePaletteWithAlpha(bytes.buffer, { ...tags, t262: [2] })).toBeNull();
+    expect(decodePaletteWithAlpha(bytes.buffer, { ...tags, t259: [5] })).toBeNull();
+    expect(decodePaletteWithAlpha(new Uint8Array([0, 255]).buffer, { ...tags, t279: [2] })).toBeNull();
   });
 });

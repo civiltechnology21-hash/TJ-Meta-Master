@@ -85,12 +85,77 @@ export function decodeEpsi(text: string): RawPreview | null {
   return { width, height, rgba };
 }
 
+/** The TIFF tags we read. UTIF stores each tag as an array under "t<number>". */
+interface TiffTags {
+  width: number;
+  height: number;
+  t258?: number[]; // bits per sample
+  t259?: number[]; // compression
+  t262?: number[]; // photometric (3 = palette)
+  t273?: number[]; // strip offsets
+  t277?: number[]; // samples per pixel
+  t279?: number[]; // strip byte counts
+  t320?: number[]; // color map (16 bit R..., G..., B...)
+  t338?: number[]; // extra samples (1 = alpha already multiplied in)
+}
+
+/**
+ * Palette TIFF with an extra alpha sample per pixel (index + alpha, 2 bytes each).
+ * Illustrator writes its EPS preview this way. UTIF reads 1 byte per pixel here, which
+ * doubles and smears the picture, so this case is decoded by hand.
+ * Returns null when the TIFF is not of this kind (UTIF handles everything else).
+ */
+export function decodePaletteWithAlpha(buffer: ArrayBuffer, t: TiffTags): RawPreview | null {
+  const samples = t.t277?.[0] ?? 1;
+  if (t.t262?.[0] !== 3 || samples < 2 || (t.t258?.[0] ?? 8) !== 8 || (t.t259?.[0] ?? 1) !== 1) return null;
+  const cmap = t.t320;
+  const offsets = t.t273;
+  const counts = t.t279;
+  if (!cmap || !offsets || !counts || cmap.length < 3 * 256) return null;
+
+  const { width, height } = t;
+  const bytes = new Uint8Array(buffer);
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const premultiplied = t.t338?.[0] === 1;
+  let pixel = 0;
+  const total = width * height;
+  for (let s = 0; s < offsets.length && pixel < total; s++) {
+    const start = offsets[s]!;
+    const end = Math.min(start + counts[s]!, bytes.length);
+    for (let i = start; i + samples <= end && pixel < total; i += samples, pixel++) {
+      const index = bytes[i]!;
+      const a = bytes[i + 1]!;
+      let r = cmap[index]! >> 8;
+      let g = cmap[256 + index]! >> 8;
+      let b = cmap[512 + index]! >> 8;
+      if (premultiplied && a > 0 && a < 255) {
+        r = Math.min(255, Math.round((r * 255) / a));
+        g = Math.min(255, Math.round((g * 255) / a));
+        b = Math.min(255, Math.round((b * 255) / a));
+      }
+      const o = pixel * 4;
+      rgba[o] = r;
+      rgba[o + 1] = g;
+      rgba[o + 2] = b;
+      rgba[o + 3] = a;
+    }
+  }
+  if (pixel < total) return null; // truncated data: let Ghostscript render it instead
+  return { width, height, rgba };
+}
+
 async function decodeTiff(buffer: ArrayBuffer): Promise<RawPreview> {
   const mod = await import("utif");
   const UTIF = (mod as unknown as { default?: typeof mod }).default ?? mod;
   const ifds = UTIF.decode(buffer);
   const first = ifds[0];
   if (!first) throw new Error(NO_PREVIEW_MESSAGE);
+  const tags = first as unknown as TiffTags;
+  const palette = decodePaletteWithAlpha(buffer, tags);
+  if (palette) return palette;
+  // Palette + extra samples that we could not decode ourselves (e.g. compressed): UTIF would
+  // misread it silently, so say "no usable preview" and let Ghostscript draw the real file.
+  if (tags.t262?.[0] === 3 && (tags.t277?.[0] ?? 1) > 1) throw new Error(NO_PREVIEW_MESSAGE);
   UTIF.decodeImage(buffer, first);
   const rgba = UTIF.toRGBA8(first);
   return {

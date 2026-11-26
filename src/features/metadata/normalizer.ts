@@ -6,6 +6,7 @@ import {
   sanitizeSafeText,
   sanitizeTitleStrict,
   stem,
+  stripBanned,
   tokens,
 } from "./rulesText";
 
@@ -198,12 +199,13 @@ export function normalizeMeta(
   raw: RawMeta,
   c: UserConstraints,
   rules?: MarketplaceRules,
-  opts: { kind?: MediaKind } = {},
+  opts: { kind?: MediaKind; lastChance?: boolean } = {},
 ): MetaResult {
-  const rawTitle = rules?.titleStrict ? sanitizeTitleStrict(raw.title) : raw.title;
-  const rawDescription = rules?.descriptionSafeChars
-    ? sanitizeSafeText(raw.description ?? "")
-    : (raw.description ?? "");
+  // Banned wording is cut out of the text, so it never makes a file fail.
+  const cleanTitle = stripBanned(raw.title, rules?.bannedTerms);
+  const cleanDescription = stripBanned(raw.description ?? "", rules?.bannedTerms);
+  const rawTitle = rules?.titleStrict ? sanitizeTitleStrict(cleanTitle) : cleanTitle;
+  const rawDescription = rules?.descriptionSafeChars ? sanitizeSafeText(cleanDescription) : cleanDescription;
 
   const title = rules && !rules.hasTitle ? "" : normalizeTitle(rawTitle, c.titleLimit);
   let keywords = normalizeKeywords(raw.keywords, c.keywordCount, {
@@ -226,6 +228,11 @@ export function normalizeMeta(
         ? rules.categories.filter((x) => !rules.categoriesNotForVideo!.includes(x))
         : rules.categories;
     meta.categories = normalizeCategories(raw.categories, allowed, rules.categoryCount ?? 2);
+    // Last attempt and still no valid category: use a safe fallback instead of failing the file.
+    if (meta.categories.length === 0 && opts.lastChance) {
+      const fallback = (rules.fallbackCategories ?? []).find((x) => allowed.includes(x));
+      if (fallback) meta.categories = [fallback];
+    }
   }
   return meta;
 }

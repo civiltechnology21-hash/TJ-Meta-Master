@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TagInput } from "@/components/ui/TagInput";
+import { getMarketplace } from "@/features/ai/marketplaces";
 import { NEGATIVE_LIMITS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -40,8 +41,13 @@ export function NegativePromptCard() {
   const input = useSettingsStore((s) => s.negativeInput);
   const setNegativeInput = useSettingsStore((s) => s.setNegativeInput);
 
+  const marketplace = useSettingsStore((s) => s.marketplace);
+  const market = getMarketplace(marketplace);
+  // Marketplaces without a title field (Shutterstock): the Titles part is locked.
+  const titlesOff = !market.rules.hasTitle;
+
   const { titles, keywords } = input;
-  const canAdd = titles.length < NEGATIVE_LIMITS.maxTitles;
+  const canAdd = !titlesOff && titles.length < NEGATIVE_LIMITS.maxTitles;
   const hasTitleText = titles.some((t) => t !== "");
 
   const rowRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -87,13 +93,16 @@ export function NegativePromptCard() {
       </div>
 
       {/* ---------------- Title ---------------- */}
-      <div className="border-b border-line py-4">
+      <div
+        className={cn("border-b border-line py-4", titlesOff && "pointer-events-none select-none opacity-45")}
+        aria-disabled={titlesOff}
+      >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-xs font-medium text-fg">Titles</h3>
           <div className="flex items-center gap-2">
             <ClearButton
               label="Clear all titles"
-              disabled={!hasTitleText && titles.length === 1}
+              disabled={titlesOff || (!hasTitleText && titles.length === 1)}
               onClick={() => setNegativeInput({ titles: [""] })}
             />
             <button
@@ -123,6 +132,7 @@ export function NegativePromptCard() {
                 }}
                 type="text"
                 value={title}
+                disabled={titlesOff}
                 maxLength={NEGATIVE_LIMITS.maxTitleChars}
                 autoComplete="off"
                 aria-label={`Negative title ${index + 1}`}
@@ -141,7 +151,11 @@ export function NegativePromptCard() {
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[10px] text-muted-2">Up to {NEGATIVE_LIMITS.maxTitles} title exclusions</p>
+        <p className="mt-3 text-[10px] text-muted-2">
+          {titlesOff
+            ? `${market.label} has no title field, so title exclusions are not used.`
+            : `Up to ${NEGATIVE_LIMITS.maxTitles} title exclusions`}
+        </p>
       </div>
 
       {/* ---------------- Keywords ---------------- */}

@@ -73,6 +73,19 @@ export function findBanned(text: string, banned: readonly string[] | undefined):
   });
 }
 
+/** Removes banned words/phrases from a text (whole words, any case, hyphen or space inside). */
+export function stripBanned(text: string, banned: readonly string[] | undefined): string {
+  if (!banned || banned.length === 0) return text;
+  let out = text;
+  for (const term of banned) {
+    const words = tokens(term);
+    if (words.length === 0) continue;
+    const body = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\-_]+");
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, "giu"), " ");
+  }
+  return out.replace(/\s+/g, " ").replace(/\s+([,.])/g, "$1").trim();
+}
+
 /** Keeps only letters, digits, spaces, commas, periods, hyphens and apostrophes. */
 export function sanitizeSafeText(text: string): string {
   return text

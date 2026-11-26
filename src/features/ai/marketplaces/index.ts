@@ -44,6 +44,7 @@ export const REQUIRED_DESCRIPTION_MIN = 50;
 
 /** Lowest / highest description length the slider may use for this marketplace. */
 export function descriptionRange(rules: MarketplaceRules): { min: number; max: number } {
+  if (rules.descriptionSupported === false) return { min: 0, max: 0 };
   return {
     min: rules.descriptionRequired ? REQUIRED_DESCRIPTION_MIN : 0,
     max: rules.descriptionMax ?? 400,
@@ -76,7 +77,7 @@ export function effectiveConstraints(
   constraints: UserConstraints,
 ): UserConstraints {
   const { min, max } = descriptionRange(rules);
-  const wanted = constraints.descriptionLimit;
+  const wanted = rules.descriptionSupported === false ? 0 : constraints.descriptionLimit;
   const descriptionLimit =
     wanted <= 0 ? (rules.descriptionRequired ? max : 0) : Math.min(Math.max(wanted, min), max);
   return {

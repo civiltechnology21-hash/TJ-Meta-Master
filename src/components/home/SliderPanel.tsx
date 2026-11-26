@@ -20,6 +20,7 @@ export function SliderPanel() {
   const marketplace = useSettingsStore((s) => s.marketplace);
   const market = getMarketplace(marketplace);
   const { hasTitle, descriptionRequired } = market.rules;
+  const hasDescription = market.rules.descriptionSupported !== false;
   const range = descriptionRange(market.rules);
   const descriptionValue = Math.min(Math.max(constraints.descriptionLimit, range.min), range.max);
   const titleR = titleRange(market.rules);
@@ -69,19 +70,25 @@ export function SliderPanel() {
             <p className="mt-1 text-[10px] text-muted-2">{market.label} has no title field.</p>
           )}
         </div>
-        <div>
+        <div
+          className={hasDescription ? undefined : "pointer-events-none select-none opacity-45"}
+          aria-disabled={!hasDescription}
+        >
           <Slider
             label="Description length"
-            min={range.min}
-            max={range.max}
-            value={descriptionValue}
+            min={hasDescription ? range.min : 0}
+            max={hasDescription ? range.max : 1}
+            value={hasDescription ? descriptionValue : 0}
+            disabled={!hasDescription}
             onChange={(descriptionLimit) => setConstraints({ descriptionLimit })}
-            formatValue={(v) => (v === 0 ? "Off" : String(v))}
+            formatValue={(v) => (!hasDescription ? "Not used" : v === 0 ? "Off" : String(v))}
           />
           <p className="mt-1 text-[10px] text-muted-2">
-            {descriptionRequired
-              ? `${market.label} needs a description (up to ${range.max} characters).`
-              : "Set to Off to skip descriptions."}
+            {!hasDescription
+              ? `${market.label} has no description field.`
+              : descriptionRequired
+                ? `${market.label} needs a description (up to ${range.max} characters).`
+                : "Set to Off to skip descriptions."}
           </p>
         </div>
         <Slider

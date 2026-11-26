@@ -16,6 +16,8 @@ export interface MarketplaceRules {
   hasTitle: boolean;
   /** true = the description cannot be switched off. */
   descriptionRequired: boolean;
+  /** false = the marketplace has no description field (default true). */
+  descriptionSupported?: boolean;
   /** Longest description the marketplace accepts (characters). */
   descriptionMax?: number;
   /** Fewest keywords the marketplace accepts (default 5). */
@@ -50,6 +52,8 @@ export interface MarketplaceRules {
   descriptionSafeChars?: boolean;
   /** The description may not repeat a word (or word stem). */
   noRepeatedDescriptionWords?: boolean;
+  /** Used (first one allowed for the file type) when the AI never gives a valid category. */
+  fallbackCategories?: readonly string[];
   /** Categories that cannot be used for video files. */
   categoriesNotForVideo?: readonly string[];
 }

@@ -109,7 +109,9 @@ export const useBatchStore = create<BatchState>()((set, get) => ({
 
     // Frozen now: changing the card later never alters a batch that is already running.
     // null (nothing typed) = Negative Prompt is off and the batch runs exactly as before.
-    const negative = buildNegativePolicy(useSettingsStore.getState().negativeInput);
+    const negative = buildNegativePolicy(useSettingsStore.getState().negativeInput, {
+      withTitles: getMarketplace(marketplace).rules.hasTitle,
+    });
     runner = new BatchRunner(
       {
         getItems: () => get().items,
