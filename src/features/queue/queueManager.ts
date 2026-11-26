@@ -291,8 +291,8 @@ export class BatchRunner {
           return;
         }
         const rules = getMarketplace(this.hooks.getMarketplace?.()).rules;
-        const meta = normalizeMeta(raw, this.constraints, rules);
-        const check = validateMeta(meta, this.constraints, rules);
+        const meta = normalizeMeta(raw, this.constraints, rules, { kind: item.kind });
+        const check = validateMeta(meta, this.constraints, rules, { kind: item.kind });
         if (!check.ok) {
           this.failOrRetry(
             item,

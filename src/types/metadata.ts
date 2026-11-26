@@ -26,6 +26,32 @@ export interface MarketplaceRules {
   categoryCount?: number;
   /** CSV columns, in order. */
   csvColumns: readonly CsvColumnId[];
+
+  /* ---- hard limits and checks that belong to ONE marketplace only ---- */
+  /** Longest title (characters, full stop included). */
+  titleMax?: number;
+  /** Shortest title that is accepted. */
+  titleMinChars?: number;
+  /** Title: no commas, colons, slashes, quotes, hashtags, emojis, ALL CAPS. */
+  titleStrict?: boolean;
+  /** Every meaningful title word must be inside the first N keywords. */
+  titleWordsInTopKeywords?: number;
+  /** Most keywords the marketplace accepts. */
+  keywordMax?: number;
+  /** A word stem may appear in at most this many keywords. */
+  stemCap?: number;
+  /** Words/phrases that may never appear in the title, description or keywords. */
+  bannedTerms?: readonly string[];
+  /** Keywords that are silently removed (fillers, evaluatives). */
+  droppedKeywords?: readonly string[];
+  /** Description needs at least this many words. */
+  descriptionMinWords?: number;
+  /** Description may only use letters, digits, spaces, commas, periods, hyphens, apostrophes. */
+  descriptionSafeChars?: boolean;
+  /** The description may not repeat a word (or word stem). */
+  noRepeatedDescriptionWords?: boolean;
+  /** Categories that cannot be used for video files. */
+  categoriesNotForVideo?: readonly string[];
 }
 
 /** The 3 slider values chosen by the user on the Home page. */

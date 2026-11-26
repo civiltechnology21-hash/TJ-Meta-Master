@@ -1,4 +1,13 @@
+import type { MediaKind } from "@/types/files";
 import type { MarketplaceRules, MetaResult, UserConstraints } from "@/types/metadata";
+import {
+  alignTitleKeywords,
+  findBanned,
+  sanitizeSafeText,
+  sanitizeTitleStrict,
+  stem,
+  tokens,
+} from "./rulesText";
 
 /**
  * Hard-enforces the output rules, whatever the AI returned:
@@ -99,13 +108,28 @@ export function normalizeDescription(raw: string, limit: number): string {
   return out;
 }
 
-export function normalizeKeywords(raw: string[] | string | undefined, count: number): string[] {
+export interface KeywordRules {
+  /** Keywords holding any of these words/phrases are removed. */
+  banned?: readonly string[];
+  /** Keywords that are exactly one of these are removed. */
+  dropped?: readonly string[];
+  /** A word stem may appear in at most this many keywords. */
+  stemCap?: number;
+}
+
+export function normalizeKeywords(
+  raw: string[] | string | undefined,
+  count: number,
+  rules: KeywordRules = {},
+): string[] {
   const parts = Array.isArray(raw)
     ? raw.flatMap((k) => String(k).split(/[,;\n]+/))
     : String(raw ?? "").split(/[,;\n]+/);
 
   const seen = new Set<string>();
   const out: string[] = [];
+  const stemCount = new Map<string, number>();
+  const dropped = new Set((rules.dropped ?? []).map((d) => d.toLowerCase()));
 
   for (const part of parts) {
     let k = squash(part)
@@ -117,8 +141,17 @@ export function normalizeKeywords(raw: string[] | string | undefined, count: num
 
     if (k.length < 2 || k.length > 40 || k.split(" ").length > 4) continue;
 
+    if (dropped.has(k) || findBanned(k, rules.banned).length > 0) continue;
+
     const key = k.length > 3 ? k.replace(/s$/, "") : k; // flag / flags count as one
     if (seen.has(key)) continue;
+
+    if (rules.stemCap) {
+      const stems = [...new Set(tokens(k).filter((t) => t.length >= 3).map(stem))];
+      if (stems.some((s) => (stemCount.get(s) ?? 0) >= rules.stemCap!)) continue;
+      for (const s of stems) stemCount.set(s, (stemCount.get(s) ?? 0) + 1);
+    }
+
     seen.add(key);
     out.push(k);
     if (out.length >= count) break;
@@ -161,14 +194,38 @@ export interface RawMeta {
 }
 
 /** `rules` = the marketplace's structure. Left out = the original title + description + keywords. */
-export function normalizeMeta(raw: RawMeta, c: UserConstraints, rules?: MarketplaceRules): MetaResult {
+export function normalizeMeta(
+  raw: RawMeta,
+  c: UserConstraints,
+  rules?: MarketplaceRules,
+  opts: { kind?: MediaKind } = {},
+): MetaResult {
+  const rawTitle = rules?.titleStrict ? sanitizeTitleStrict(raw.title) : raw.title;
+  const rawDescription = rules?.descriptionSafeChars
+    ? sanitizeSafeText(raw.description ?? "")
+    : (raw.description ?? "");
+
+  const title = rules && !rules.hasTitle ? "" : normalizeTitle(rawTitle, c.titleLimit);
+  let keywords = normalizeKeywords(raw.keywords, c.keywordCount, {
+    banned: rules?.bannedTerms,
+    dropped: rules?.droppedKeywords,
+    stemCap: rules?.stemCap,
+  });
+  if (title && rules?.titleWordsInTopKeywords) {
+    keywords = alignTitleKeywords(title, keywords, rules.titleWordsInTopKeywords, c.keywordCount);
+  }
+
   const meta: MetaResult = {
-    title: rules && !rules.hasTitle ? "" : normalizeTitle(raw.title, c.titleLimit),
-    description: c.descriptionLimit > 0 ? normalizeDescription(raw.description ?? "", c.descriptionLimit) : "",
-    keywords: normalizeKeywords(raw.keywords, c.keywordCount),
+    title,
+    description: c.descriptionLimit > 0 ? normalizeDescription(rawDescription, c.descriptionLimit) : "",
+    keywords,
   };
   if (rules?.categories) {
-    meta.categories = normalizeCategories(raw.categories, rules.categories, rules.categoryCount ?? 2);
+    const allowed =
+      opts.kind === "video" && rules.categoriesNotForVideo
+        ? rules.categories.filter((x) => !rules.categoriesNotForVideo!.includes(x))
+        : rules.categories;
+    meta.categories = normalizeCategories(raw.categories, allowed, rules.categoryCount ?? 2);
   }
   return meta;
 }

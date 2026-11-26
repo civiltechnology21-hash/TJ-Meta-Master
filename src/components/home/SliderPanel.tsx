@@ -1,8 +1,12 @@
 "use client";
 
 import { Slider } from "@/components/ui/Slider";
-import { descriptionRange, getMarketplace } from "@/features/ai/marketplaces";
-import { SLIDER_LIMITS } from "@/lib/constants";
+import {
+  descriptionRange,
+  getMarketplace,
+  keywordRange,
+  titleRange,
+} from "@/features/ai/marketplaces";
 import { useSettingsStore } from "@/store/settingsStore";
 
 /**
@@ -18,6 +22,9 @@ export function SliderPanel() {
   const { hasTitle, descriptionRequired } = market.rules;
   const range = descriptionRange(market.rules);
   const descriptionValue = Math.min(Math.max(constraints.descriptionLimit, range.min), range.max);
+  const titleR = titleRange(market.rules);
+  const keywordR = keywordRange(market.rules);
+  const fit = (v: number, r: { min: number; max: number }) => Math.min(Math.max(v, r.min), r.max);
 
   return (
     <section
@@ -51,9 +58,9 @@ export function SliderPanel() {
         >
           <Slider
             label="Title length"
-            min={SLIDER_LIMITS.title.min}
-            max={SLIDER_LIMITS.title.max}
-            value={constraints.titleLimit}
+            min={titleR.min}
+            max={titleR.max}
+            value={fit(constraints.titleLimit, titleR)}
             disabled={!hasTitle}
             onChange={(titleLimit) => setConstraints({ titleLimit })}
             formatValue={hasTitle ? undefined : () => "Not used"}
@@ -79,9 +86,9 @@ export function SliderPanel() {
         </div>
         <Slider
           label="Keyword count"
-          min={SLIDER_LIMITS.keywords.min}
-          max={SLIDER_LIMITS.keywords.max}
-          value={constraints.keywordCount}
+          min={keywordR.min}
+          max={keywordR.max}
+          value={fit(constraints.keywordCount, keywordR)}
           onChange={(keywordCount) => setConstraints({ keywordCount })}
         />
       </div>

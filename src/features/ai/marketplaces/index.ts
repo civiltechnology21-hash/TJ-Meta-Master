@@ -1,3 +1,4 @@
+import { SLIDER_LIMITS } from "@/lib/constants";
 import type { MarketplaceRules, UserConstraints } from "@/types/metadata";
 import type { NegativePolicy } from "@/types/negative";
 import { ADOBE_STOCK_RULES, buildAdobeStockInstruction } from "./adobeStock";
@@ -49,9 +50,25 @@ export function descriptionRange(rules: MarketplaceRules): { min: number; max: n
   };
 }
 
+/** Title slider range for this marketplace (Adobe Stock: at most 70 characters). */
+export function titleRange(rules: MarketplaceRules): { min: number; max: number } {
+  const max = Math.min(rules.titleMax ?? SLIDER_LIMITS.title.max, SLIDER_LIMITS.title.max);
+  return { min: Math.min(SLIDER_LIMITS.title.min, max), max };
+}
+
+/** Keyword slider range for this marketplace (Adobe Stock: at most 49). */
+export function keywordRange(rules: MarketplaceRules): { min: number; max: number } {
+  return {
+    min: SLIDER_LIMITS.keywords.min,
+    max: Math.min(rules.keywordMax ?? SLIDER_LIMITS.keywords.max, SLIDER_LIMITS.keywords.max),
+  };
+}
+
+const clampTo = (value: number, r: { min: number; max: number }) => Math.min(Math.max(value, r.min), r.max);
+
 /**
  * The limits a batch really runs with: the slider values, adjusted to what the
- * marketplace allows (e.g. Shutterstock: description always on, at most 200 characters).
+ * marketplace allows (e.g. Shutterstock: description always on, at most 150 characters; Adobe Stock: title at most 70).
  * The saved slider values are never changed, so switching marketplace is lossless.
  */
 export function effectiveConstraints(
@@ -62,5 +79,9 @@ export function effectiveConstraints(
   const wanted = constraints.descriptionLimit;
   const descriptionLimit =
     wanted <= 0 ? (rules.descriptionRequired ? max : 0) : Math.min(Math.max(wanted, min), max);
-  return { ...constraints, descriptionLimit };
+  return {
+    titleLimit: clampTo(constraints.titleLimit, titleRange(rules)),
+    descriptionLimit,
+    keywordCount: clampTo(constraints.keywordCount, keywordRange(rules)),
+  };
 }

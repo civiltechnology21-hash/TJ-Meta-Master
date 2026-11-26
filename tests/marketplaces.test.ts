@@ -41,8 +41,8 @@ describe("marketplace registry", () => {
     expect(AS.categories).toBeUndefined();
   });
   it("the Shutterstock instruction asks for no title and lists the categories", () => {
-    const text = getMarketplace("shutterstock").buildInstruction({ ...c, descriptionLimit: 200 });
-    expect(text).toContain("NO title field");
+    const text = getMarketplace("shutterstock").buildInstruction({ ...c, descriptionLimit: 150 });
+    expect(text).toContain("NEVER a separate title");
     expect(text).toContain("Backgrounds/Textures");
     expect(text).toContain('"categories"');
     expect(text).not.toContain('"title"');
@@ -50,15 +50,17 @@ describe("marketplace registry", () => {
 });
 
 describe("effectiveConstraints", () => {
-  it("leaves Adobe Stock limits as they are (description may be Off)", () => {
-    expect(effectiveConstraints(AS, c)).toEqual(c);
+  it("Adobe Stock: title at most 70, keywords at most 49, description may be Off", () => {
+    expect(effectiveConstraints(AS, c)).toEqual({ titleLimit: 70, descriptionLimit: 250, keywordCount: 49 });
     expect(effectiveConstraints(AS, { ...c, descriptionLimit: 0 }).descriptionLimit).toBe(0);
+    expect(effectiveConstraints(AS, { ...c, titleLimit: 64 }).titleLimit).toBe(64);
   });
-  it("caps Shutterstock description at 200 and never lets it be Off", () => {
-    expect(effectiveConstraints(SS, c).descriptionLimit).toBe(200);
-    expect(effectiveConstraints(SS, { ...c, descriptionLimit: 0 }).descriptionLimit).toBe(200);
+  it("Shutterstock: description at most 150, never Off, keywords at most 50", () => {
+    expect(effectiveConstraints(SS, c).descriptionLimit).toBe(150);
+    expect(effectiveConstraints(SS, { ...c, descriptionLimit: 0 }).descriptionLimit).toBe(150);
     expect(effectiveConstraints(SS, { ...c, descriptionLimit: 20 }).descriptionLimit).toBe(50);
-    expect(descriptionRange(SS)).toEqual({ min: 50, max: 200 });
+    expect(effectiveConstraints(SS, c).keywordCount).toBe(50);
+    expect(descriptionRange(SS)).toEqual({ min: 50, max: 150 });
   });
 });
 
@@ -90,7 +92,7 @@ describe("normalizeCategories", () => {
   });
   it("drops unknown names and accepts a comma string", () => {
     expect(normalizeCategories("Made up, food and drink", SHUTTERSTOCK_CATEGORIES, 2)).toEqual([
-      "Food and drink",
+      "Food and Drink",
     ]);
     expect(normalizeCategories(undefined, SHUTTERSTOCK_CATEGORIES, 2)).toEqual([]);
   });
