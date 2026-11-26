@@ -1,57 +1,116 @@
+<div align="center">
+
 # TJ Meta Master
 
-Generate SEO-ready titles, descriptions and keywords for stock images and videos, in bulk, straight from the browser.
+**Bulk stock-metadata generator for Adobe Stock and Shutterstock.**
+Drop in your files, pick one marketplace, set your limits, download a ready-to-upload CSV.
 
-Drop in a folder, pick a marketplace, set your limits and export a CSV. Original files never leave your machine: only small previews are sent to the Gemini API, and only the finished CSV is stored.
+</div>
 
 <p align="center">
-  <img src="docs/negative-prompts.png" alt="Length sliders and the Negative Prompts card" width="420">
+  <img src="docs/project-structure.png" alt="TJ Meta Master project structure" width="760">
 </p>
+
+---
+
+## At a glance
+
+| | |
+|---|---|
+| **Marketplaces** | Adobe Stock, Shutterstock (one per batch, rules never mixed) |
+| **Formats** | JPG, JPEG, PNG, GIF, WebP, SVG, AI, EPS, MP4, MOV |
+| **AI** | Google Gemini, using your own free key |
+| **Privacy** | Originals never leave your computer; only small previews are sent |
+| **Output** | One CSV per batch, named after the marketplace |
 
 ## Features
 
-- **Bulk input.** Select files or a whole folder, or drag and drop. Folders are scanned recursively.
-- **Formats.** JPG, JPEG, PNG, GIF, EPS, MP4 and MOV.
-- **Local previews.** Thumbnails are built in the browser with Web Workers. EPS files use their embedded preview or are rendered with Ghostscript (WebAssembly). Videos are sampled at three points.
-- **Adjustable output.** Sliders for title length (60–200), description length (0–400, where 0 turns it off) and keyword count (10–50).
-- **Negative Prompts.** Tell the generator which titles to avoid and which words must never appear. See [below](#negative-prompts).
-- **Resilient queue.** Three files per request, paced to stay under the free-tier rate limit. Rate limits wait and retry, busy models fall back to the next one, and key or quota problems pause the batch so you can resume after fixing them.
-- **Results page.** Virtualized list that stays smooth with large batches, live progress, per-file retry and one-click CSV export.
-- **CSV history.** Every finished batch is saved to your account, and you can download, rename or delete it later.
+- **Bulk input.** Select files or a folder, or drag and drop. Folders are scanned recursively.
+- **Marketplace-aware.** Each marketplace has its own prompt, validator, limits and CSV layout.
+- **Local previews.** Built in the browser, so nothing is uploaded. See [Previews](#previews).
+- **Adjustable output.** Sliders for title, description and keyword count, limited to what the selected marketplace really allows.
+- **Negative Prompts.** Titles to avoid and words that must never appear.
+- **Fast, resilient queue.** Parallel requests, automatic model fallback, pause and resume.
+- **Results page.** Live progress, per-file retry, one-click CSV export.
+- **CSV history.** Finished batches are saved to your account and can be downloaded, renamed or deleted.
+
+## Marketplaces
+
+| | Adobe Stock | Shutterstock |
+|---|---|---|
+| Title | Yes, up to 200 characters (slider) | No title field |
+| Description | Not used (locked off) | Required, 50–500 characters (slider) |
+| Keywords | 5–49 | 7–50 |
+| Categories | Not requested | 2 per file, from Shutterstock's fixed list |
+| CSV columns | `filename, title, description, keywords` | `filename, description, keywords, categories` |
+| Title words | The first words of the title must also be the first keywords | n/a |
+
+Sliders that a marketplace does not use are greyed out. Your saved slider values are never changed when you switch marketplace.
+
+**Why the Shutterstock description stops at 500.** The CSV technically accepts 2048 characters, but Shutterstock recommends a short, natural sentence. 500 is a deliberate ceiling above that guidance, not a platform limit.
+
+**Rules are strict or soft.**
+- *Hard* (checked, the file is regenerated): minimum lengths, allowed characters, banned wording, unknown categories.
+- *Soft* (retried once, then accepted): repeated words in a description, a missing category. Banned words are removed automatically instead of failing the file.
 
 ## How it works
 
-1. Files are filtered and turned into small JPEG previews in the browser. The originals are never uploaded.
-2. Previews go directly from the browser to the Gemini API using your own key. Nothing passes through Vercel or Supabase.
-3. Each answer is parsed, normalized and checked against your limits before it is accepted.
-4. The finished batch is written to Supabase as one CSV row.
+1. Files are filtered and turned into small previews in the browser.
+2. Previews go straight from the browser to the Gemini API with your own key. Nothing passes through Vercel or Supabase.
+3. Each answer is parsed, normalized and checked against the marketplace rules.
+4. The finished batch is written to Supabase as one CSV.
 
-The Gemini key, slider values and Negative Prompt entries live in your browser's `localStorage`. The database holds only login accounts and the `csv_exports` table.
+### Speed and queue
+
+- **4 files per request**, **2 requests at the same time**, up to **10 requests per minute**.
+- Gemini's "thinking" is set to the minimum. Metadata is a simple visual task, and thinking was the biggest source of delay.
+- A per-minute limit makes the queue wait and retry. An overloaded model falls back to the next one. A bad key or finished daily quota pauses the batch so you can fix it and resume.
+- A failing group is sent again as a whole first, then file by file, so one bad file cannot take the others down.
+
+Tune the numbers in `src/lib/constants.ts` (`AI`) if Google changes its free-tier limits.
+
+### Previews
+
+| Format | How the preview is made |
+|---|---|
+| JPG, PNG, GIF, WebP | Decoded and resized in the browser |
+| SVG | Drawn safely on a canvas (scripts do not run) |
+| AI | Rendered with Ghostscript (WebAssembly) |
+| EPS | Embedded preview when present, otherwise Ghostscript |
+| MP4, MOV | Frames sampled at three points |
+
+White margins around vector artwork are cropped so the model sees the real subject.
+
+## Data and storage
+
+| Where | What |
+|---|---|
+| Browser `localStorage` | Gemini key, slider values, selected marketplace, Negative Prompt entries |
+| Supabase `csv_exports` | One row per finished CSV |
+| Not stored anywhere | Your original files, previews, and the AI's raw answers |
+
+`csv_exports` columns: `id` (uuid), `user_id` (uuid, owner), `kind` (`single` or `batch`), `file_name` (1–200 characters), `csv_content` (the CSV text, up to 5 MB) and a creation time. Row-level security keeps each user's rows private.
+
+CSV files are named `tj-meta-<marketplace>-YYYY-MM-DD_hh-mm-ssAM.csv`.
 
 ## Negative Prompts
 
-Optional rules that shape what the generator is allowed to write. They sit under the sliders on the home page.
-
 | Field | Limit | Purpose |
 |---|---|---|
-| Title | up to 5 | Example titles to steer away from. They describe a style to avoid, not a list of banned words. |
-| Keywords | up to 30 | Words or phrases that must not appear in the title, description or keyword list. |
+| Titles | up to 5 | Example titles whose style to avoid (locked for Shutterstock, which has no title) |
+| Keywords | up to 30 | Words or phrases that must not appear anywhere in the result |
 
-**Editing.** Every title row has a `×` to remove it (the last remaining row is cleared instead), and both the Title and Keywords sections have a **Clear** button that empties them at once. Clearing cannot be undone, and with everything cleared a batch runs as if the feature did not exist.
+- Type a word or phrase and press comma then space to create a tag. Multi-word phrases stay together.
+- Matching is by whole word and ignores case and punctuation: `tree` matches `Trees`, not `street`.
+- A file that breaks a rule is regenerated on its own with the offending wording named. After the allowed attempts it is marked failed and can be retried.
+- Rules are frozen when the batch starts, and empty rules change nothing.
 
-**Entering keywords.** Type a word or phrase and press comma then space. Everything before the comma becomes one tag, so multi-word phrases such as `santa claus` stay together. Backspace on an empty field removes the last tag.
+## Limitations
 
-**What happens during a batch**
-
-- The rules are added to the marketplace instruction as quoted data, so the text you type cannot act as an instruction to the model.
-- Every result is checked locally against whole words. `tree` matches `Tree`, `tree,` and `trees`, but not `street`. Case and punctuation differences do not get around a rule.
-- A file that still breaks a rule is generated again on its own, with the offending wording named. The rest of its group of three is untouched.
-- After three attempts the file is marked as failed and can be retried. A violation is never accepted silently and keywords are never quietly deleted.
-- The rules are frozen when the batch starts, so editing the card mid-run does not affect it.
-
-Leave both fields empty and the feature does nothing: the instruction and the requests are identical to a build without it.
-
-Each retry is one more API request, so a long list of rarely avoidable words can slow a batch down on the free tier.
+- Free Gemini keys have per-minute and per-day quotas. Google applies them per project, so a replacement key should come from another project or account.
+- Metadata quality depends on the preview. A very small or blank embedded EPS preview is re-rendered, which is slower.
+- Adobe's own CSV page lists 70 characters for titles. If a very long title is trimmed on upload, lower the Title slider.
+- Only one marketplace per batch.
 
 ## Tech stack
 
@@ -67,41 +126,35 @@ cp .env.example .env.local   # add your Supabase URL and anon key
 npm run dev
 ```
 
-Then open http://localhost:3000.
-
-Before the first run, prepare Supabase as described in [`supabase/README.md`](supabase/README.md): run the two files in `supabase/migrations/` in order, turn off public sign-ups and create your users. Each user adds their own Gemini API key in **Settings → API Configuration**.
-
-## Scripts
+Open http://localhost:3000. Prepare Supabase as described in [`supabase/README.md`](supabase/README.md), then each user adds their own Gemini key in **Settings → API Configuration**.
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
-| `npm start` | Run the production build |
 | `npm run typecheck` | TypeScript check |
-| `npm test` | Unit tests (Vitest) |
-
-`dev` and `build` first run `scripts/prepare-assets.mjs`, which copies the Ghostscript files into `public/gs` and picks up `public/logo.*` and `public/brand-name.*`. To rebrand, replace those images and redeploy.
+| `npm test` | Unit tests |
 
 ## Project structure
 
 ```
 src/
   app/                  Routes: login, home, results
-  components/           UI (home, results, settings, ui primitives)
+  components/           UI
   features/
     ai/                 Gemini client, prompts, marketplace rules, rate limiter
-    csv/                CSV building, download and history
-    ingest/             File and folder scanning, format filter
-    metadata/           Normalizer and validator
-    negative/           Negative Prompt rules, matching and prompt section
-    queue/              Batch runner (grouping, retries, pausing)
-    thumbnail/          Image, video and EPS previews (Web Workers)
+    csv/                CSV building, download, history
+    ingest/             File and folder scanning
+    metadata/           Normalizer, validator, rule helpers
+    negative/           Negative Prompt rules
+    queue/              Batch runner
+    thumbnail/          Image, SVG, AI, EPS and video previews
   lib/                  Constants, storage, Supabase clients
   store/                Zustand stores
   types/
 supabase/               Migrations and setup guide
 tests/                  Vitest suites
+docs/                   README images
 ```
 
 Adding a marketplace means writing its rules file in `src/features/ai/marketplaces/` and registering it in `index.ts`.
@@ -111,9 +164,3 @@ Adding a marketplace means writing its rules file in `src/features/ai/marketplac
 1. Import the repository into Vercel.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 3. Deploy, then set the Supabase **Site URL** to your Vercel URL.
-
-## Notes
-
-- Gemini model names and the free-tier pacing are defined in `src/lib/constants.ts` (`AI`). Review them when Google changes its lineup.
-- Google applies rate limits per project, not per key, so a replacement key should come from a different project or account.
-- An EPS with a missing or very small embedded preview is rendered with Ghostscript instead, which is slower.

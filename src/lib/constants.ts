@@ -17,7 +17,7 @@ export const PUBLIC_ROUTES: readonly string[] = [ROUTES.login];
 export const SLIDER_LIMITS = {
   title: { min: 60, max: 200, default: 200 },
   /** 0 = no description at all (Title + Keywords only). */
-  description: { min: 0, max: 400, default: 250 },
+  description: { min: 0, max: 500, default: 250 },
   keywords: { min: 10, max: 50, default: 50 },
 } as const;
 

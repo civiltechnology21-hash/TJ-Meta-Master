@@ -47,7 +47,7 @@ export function descriptionRange(rules: MarketplaceRules): { min: number; max: n
   if (rules.descriptionSupported === false) return { min: 0, max: 0 };
   return {
     min: rules.descriptionRequired ? REQUIRED_DESCRIPTION_MIN : 0,
-    max: rules.descriptionMax ?? 400,
+    max: rules.descriptionMax ?? 500,
   };
 }
 

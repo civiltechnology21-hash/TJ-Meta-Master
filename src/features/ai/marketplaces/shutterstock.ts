@@ -68,8 +68,8 @@ export const SHUTTERSTOCK_DROPPED_KEYWORDS = [
 export const SHUTTERSTOCK_RULES: MarketplaceRules = {
   hasTitle: false,
   descriptionRequired: true,
-  // Shutterstock's real maximum is 2048 characters (official CSV/standards page). The slider decides the length.
-  descriptionMax: 2048,
+  // Shutterstock's CSV limit is 2048, but Shutterstock recommends about 200 and good contributors stay under 500, so 500 is our ceiling. The slider decides.
+  descriptionMax: 500,
   descriptionMinWords: 5,
   descriptionSafeChars: true,
   noRepeatedDescriptionWords: true,
